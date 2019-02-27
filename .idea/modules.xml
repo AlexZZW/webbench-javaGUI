@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/workbench.iml" filepath="$PROJECT_DIR$/workbench.iml" />
+      <module fileurl="file://$PROJECT_DIR$/webbench-javaGUI.iml" filepath="$PROJECT_DIR$/webbench-javaGUI.iml" />
     </modules>
   </component>
 </project>

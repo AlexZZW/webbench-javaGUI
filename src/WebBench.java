@@ -46,12 +46,12 @@ class BenchCore implements Runnable {
                 if (this.failed > 0) {
                     this.failed--;
                 }
-                return;
+                break;
             }
             try {
                 sock = new Socket(this.host, this.port);
                 addr = sock.getInetAddress();
-                logger.debug("连接到" + addr);
+//                logger.debug("连接到" + addr);
             } catch (Exception e) {
                 this.failed++;
                 continue;
@@ -76,7 +76,7 @@ class BenchCore implements Runnable {
                     while ((info = buf.readLine()) != null) {
                         sbu.append(info);
                     }
-                    logger.debug(sbu);
+//                    logger.debug(sbu);
                     this.bytes += sbu.length();
                 } catch (Exception e) {
                     this.failed++;
@@ -95,8 +95,10 @@ class BenchCore implements Runnable {
                 this.failed++;
                 e.printStackTrace();
             }
-
         }
+        String info = String.format("failed:%d, speed:%d, bytes:%d",this.failed, this.speed, this.bytes);
+        logger.warn(info);
+//        System.out.println(info);
     }
 }
 
@@ -112,6 +114,7 @@ public class WebBench {
     String proxyhost = null;
     Method method = Method.GET;
     String url;
+    String requests;
 
     public static void Copyright() {
         logger.warn("Webbench - Simple Web Benchmark " + PROGRAM_VERSION + "\n Copyright (c) Radim Kolar 1997-2004, GPL Open Source Software.\n");
@@ -125,11 +128,11 @@ public class WebBench {
     public WebBench(String url) {
         this();
         this.url = url;
+        this.requests = build_request();
     }
 
     public WebBench(String url, Level level) {
-        this();
-        this.url = url;
+        this(url);
         logger.setLevel(level);
     }
 
@@ -150,7 +153,7 @@ public class WebBench {
     }
 
     public String getRequest() {
-        return build_request();
+        return this.requests;
     }
 
     public String build_request() {
@@ -174,6 +177,7 @@ public class WebBench {
         } else {
             host = tmpUrl.substring(0, firstSlash);
         }
+        this.proxyhost = host;
         if (firstSlash == tmpUrl.length() - 1) {
             req = "/";
         } else {
@@ -237,11 +241,14 @@ public class WebBench {
     }
 
     public static void main(String[] args) {
-//        ThreadPoolExecutor tp = new ThreadPoolExecutor(10, 20, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
-        WebBench wb = new WebBench("http://gerrit.zte.com.cn/");
+        ThreadPoolExecutor tp = new ThreadPoolExecutor(10, 20, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+        WebBench wb = new WebBench("http://www.baidu.com/");
         logger.debug(wb.getRequest());
-        logger.debug(wb.getProxyhost());
-        logger.debug(wb.getProxyport());
-
+        for(int i=0;i<3;i++) {
+            BenchCore task = new BenchCore(wb.getProxyhost(), wb.getProxyport(), wb.getRequest(), 5, true);
+            tp.execute(task);
+            logger.debug(i);
+        }
+        logger.debug("finish");
     }
 }
