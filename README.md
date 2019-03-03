@@ -1,3 +1,2 @@
 # webbench-javaGUI
-depend on webbench C, use java
-add GUI
+depend on webbench C, use java， add GUI
