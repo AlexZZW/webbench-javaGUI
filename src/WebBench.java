@@ -1,15 +1,11 @@
-//import org.apache.log4j.BasicConfigurator;
-//import org.apache.log4j.Logger;
-//import org.apache.log4j.Level;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
-import java.net.*;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.InputStreamReader;
+import java.net.InetAddress;
+import java.net.Socket;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -18,67 +14,49 @@ enum Method {
     GET, HEAD, OPTIONS, TRACE
 }
 
-class BenchCore implements Runnable {
-    String host;
-    int port;
-    String req;
-    int timeout;
-    int failed = 0;
-    int bytes = 0;
-    int speed = 0;
-    boolean reply;
-    static final Logger logger = LoggerFactory.getLogger(BenchCore.class);
+public class WebBench {
+    static final Logger logger = LoggerFactory.getLogger(WebBench.class);
+    static String PROGRAM_VERSION = "1.5";
+    int clients = 3;
+    int benchtime = 5;
+    int http10 = 1;
+    int force = 0;
+    int force_reload = 0;
+    int proxyport = 80;
+    String proxyhost = null;
+    Method method = Method.GET;
+    String url;
+    String requests;
+    boolean reply = false;
 
-    public BenchCore(WebBench wb) {
-        this.host = wb.getProxyhost();
-        this.port = wb.getProxyport();
-        this.req = wb.getRequest();
-        this.timeout = 5;
-        this.reply = true;
-    }
+    class BenchCore implements Runnable {
+        int failed = 0;
+        int bytes = 0;
+        int speed = 0;
 
-    public void run() {
-        Socket sock;
-        InetAddress addr;
-        long time1 = System.currentTimeMillis();
-        while (true) {
-            long time2 = System.currentTimeMillis();
-            if (time2 - time1 >= this.timeout * 1000) {
-                if (this.failed > 0) {
-                    this.failed--;
-                }
-                break;
-            }
-            try {
-                sock = new Socket(this.host, this.port);
-                addr = sock.getInetAddress();
-//                logger.debug("连接到" + addr);
-            } catch (Exception e) {
-                this.failed++;
-                continue;
-            }
-            try {
-                DataOutputStream dos = new DataOutputStream(sock.getOutputStream());
-                dos.writeUTF(this.req);
-            } catch (Exception e) {
-                this.failed++;
-                try {
-                    sock.close();
-                } catch (Exception e2) {
-                    e2.printStackTrace();
-                }
-                continue;
-            }
-            if (this.reply) {
-                try {
-                    BufferedReader buf = new BufferedReader(new InputStreamReader(sock.getInputStream()));
-                    String info = null;
-                    StringBuffer sbu = new StringBuffer();
-                    while ((info = buf.readLine()) != null) {
-                        sbu.append(info);
+        public void run() {
+            Socket sock;
+            InetAddress addr;
+            long time1 = System.currentTimeMillis();
+            while (true) {
+                long time2 = System.currentTimeMillis();
+                if (time2 - time1 >= benchtime * 1000) {
+                    if (this.failed > 0) {
+                        this.failed--;
                     }
-//                    logger.debug(sbu);
-                    this.bytes += sbu.length();
+                    break;
+                }
+                try {
+                    sock = new Socket(proxyhost, proxyport);
+                    addr = sock.getInetAddress();
+                    logger.trace("连接到" + addr);
+                } catch (Exception e) {
+                    this.failed++;
+                    continue;
+                }
+                try {
+                    DataOutputStream dos = new DataOutputStream(sock.getOutputStream());
+                    dos.writeUTF(requests);
                 } catch (Exception e) {
                     this.failed++;
                     try {
@@ -88,41 +66,45 @@ class BenchCore implements Runnable {
                     }
                     continue;
                 }
+                if (reply) {
+                    try {
+                        BufferedReader buf = new BufferedReader(new InputStreamReader(sock.getInputStream()));
+                        String info = null;
+                        StringBuffer sbu = new StringBuffer();
+                        while ((info = buf.readLine()) != null) {
+                            sbu.append(info);
+                        }
+//                    logger.debug(sbu);
+                        this.bytes += sbu.length();
+                    } catch (Exception e) {
+                        this.failed++;
+                        try {
+                            sock.close();
+                        } catch (Exception e2) {
+                            e2.printStackTrace();
+                        }
+                        continue;
+                    }
+                }
+                try {
+                    sock.close();
+                    this.speed++;
+                } catch (Exception e) {
+                    this.failed++;
+                    e.printStackTrace();
+                }
             }
-            try {
-                sock.close();
-                this.speed++;
-            } catch (Exception e) {
-                this.failed++;
-                e.printStackTrace();
-            }
+            String info = String.format("failed:%d, speed:%d, bytes:%d", this.failed, this.speed, this.bytes);
+            logger.warn(info);
         }
-        String info = String.format("failed:%d, speed:%d, bytes:%d", this.failed, this.speed, this.bytes);
-        logger.warn(info);
     }
-}
-
-public class WebBench {
-    static final Logger logger = LoggerFactory.getLogger(WebBench.class);
-    static String PROGRAM_VERSION = "1.5";
-    int clients = 3;
-    int benchtime = 60;
-    int http10 = 1;
-    int force = 0;
-    int force_reload = 0;
-    int proxyport = 80;
-    String proxyhost = null;
-    Method method = Method.GET;
-    String url;
-    String requests;
 
     public static void Copyright() {
         logger.warn("Webbench - Simple Web Benchmark " + PROGRAM_VERSION + "\n Copyright (c) Radim Kolar 1997-2004, GPL Open Source Software.\n");
     }
 
     public WebBench(String url) {
-        this.url = url;
-        this.requests = build_request();
+        this.requests = build_request(url);
     }
 
     public int getClients() {
@@ -145,8 +127,8 @@ public class WebBench {
         return this.requests;
     }
 
-    public String build_request() {
-        String url = this.url;
+    public String build_request(String url) {
+        this.url = url;
         String req = null;
         String host = null;
         if (!url.startsWith("http://") || url.length() > 1500) {
@@ -233,7 +215,7 @@ public class WebBench {
         ThreadPoolExecutor tp = new ThreadPoolExecutor(10, 20, 5, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
         logger.debug(this.getRequest());
         for (int i = 0; i < this.clients; i++) {
-            BenchCore task = new BenchCore(this);
+            BenchCore task = this.new BenchCore();
             tp.execute(task);
             logger.debug(String.valueOf(i));
         }
