@@ -29,12 +29,12 @@ class BenchCore implements Runnable {
     boolean reply;
     static final Logger logger = LoggerFactory.getLogger(BenchCore.class);
 
-    public BenchCore(String host, int port, String req, int timeout, boolean reply) {
-        this.host = host;
-        this.port = port;
-        this.req = req;
-        this.timeout = timeout;
-        this.reply = reply;
+    public BenchCore(WebBench wb) {
+        this.host = wb.getProxyhost();
+        this.port = wb.getProxyport();
+        this.req = wb.getRequest();
+        this.timeout = 5;
+        this.reply = true;
     }
 
     public void run() {
@@ -105,7 +105,7 @@ class BenchCore implements Runnable {
 public class WebBench {
     static final Logger logger = LoggerFactory.getLogger(WebBench.class);
     static String PROGRAM_VERSION = "1.5";
-    int clients = 1;
+    int clients = 3;
     int benchtime = 60;
     int http10 = 1;
     int force = 0;
@@ -229,15 +229,21 @@ public class WebBench {
         return request.toString();
     }
 
-    public static void main(String[] args) {
-        ThreadPoolExecutor tp = new ThreadPoolExecutor(10, 20, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
-        WebBench wb = new WebBench("http://www.baidu.com/");
-        logger.debug(wb.getRequest());
-        for(int i=0;i<3;i++) {
-            BenchCore task = new BenchCore(wb.getProxyhost(), wb.getProxyport(), wb.getRequest(), 5, true);
+    public void run() {
+        ThreadPoolExecutor tp = new ThreadPoolExecutor(10, 20, 5, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+        logger.debug(this.getRequest());
+        for (int i = 0; i < this.clients; i++) {
+            BenchCore task = new BenchCore(this);
             tp.execute(task);
-            logger.debug(i);
+            logger.debug(String.valueOf(i));
         }
         logger.debug("finish");
+        tp.shutdown();
+        return;
+    }
+
+    public static void main(String[] args) {
+        WebBench wb = new WebBench("http://www.baidu.com/");
+        wb.run();
     }
 }
