@@ -1,6 +1,9 @@
-import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.Logger;
-import org.apache.log4j.Level;
+//import org.apache.log4j.BasicConfigurator;
+//import org.apache.log4j.Logger;
+//import org.apache.log4j.Level;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.*;
@@ -24,7 +27,7 @@ class BenchCore implements Runnable {
     int bytes = 0;
     int speed = 0;
     boolean reply;
-    static Logger logger = Logger.getLogger(WebBench.class);
+    static final Logger logger = LoggerFactory.getLogger(BenchCore.class);
 
     public BenchCore(String host, int port, String req, int timeout, boolean reply) {
         this.host = host;
@@ -32,8 +35,6 @@ class BenchCore implements Runnable {
         this.req = req;
         this.timeout = timeout;
         this.reply = reply;
-        BasicConfigurator.configure();
-        logger.setLevel(Level.DEBUG);
     }
 
     public void run() {
@@ -96,14 +97,13 @@ class BenchCore implements Runnable {
                 e.printStackTrace();
             }
         }
-        String info = String.format("failed:%d, speed:%d, bytes:%d",this.failed, this.speed, this.bytes);
+        String info = String.format("failed:%d, speed:%d, bytes:%d", this.failed, this.speed, this.bytes);
         logger.warn(info);
-//        System.out.println(info);
     }
 }
 
 public class WebBench {
-    static Logger logger = Logger.getLogger(WebBench.class);
+    static final Logger logger = LoggerFactory.getLogger(WebBench.class);
     static String PROGRAM_VERSION = "1.5";
     int clients = 1;
     int benchtime = 60;
@@ -120,20 +120,9 @@ public class WebBench {
         logger.warn("Webbench - Simple Web Benchmark " + PROGRAM_VERSION + "\n Copyright (c) Radim Kolar 1997-2004, GPL Open Source Software.\n");
     }
 
-    public WebBench() {
-        BasicConfigurator.configure();
-        logger.setLevel(Level.DEBUG);
-    }
-
     public WebBench(String url) {
-        this();
         this.url = url;
         this.requests = build_request();
-    }
-
-    public WebBench(String url, Level level) {
-        this(url);
-        logger.setLevel(level);
     }
 
     public int getClients() {
@@ -161,13 +150,13 @@ public class WebBench {
         String req = null;
         String host = null;
         if (!url.startsWith("http://") || url.length() > 1500) {
-            logger.fatal("url illegal");
+            logger.error("url illegal");
             return null;
         }
         String tmpUrl = url.replaceAll("http://", "").trim();
         int firstSlash = tmpUrl.indexOf('/');
         if (firstSlash == -1) {
-            logger.fatal("url illegal, no end slash");
+            logger.error("url illegal, no end slash");
             return null;
         }
         int dotPosition = tmpUrl.indexOf(':');
